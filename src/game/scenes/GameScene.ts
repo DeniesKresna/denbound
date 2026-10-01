@@ -76,7 +76,8 @@ export class GameScene extends Phaser.Scene {
     this.load.image("explosion-1", explode1Url);
     this.load.image("explosion-2", explode2Url);
     this.load.image("explosion-3", explode3Url);
-    this.load.spritesheet("land-tiles", landUrl, { frameWidth: 197, frameHeight: 222 });
+    // frameHeight must keep 4 full rows within the 887px source height (4 * 222 would overflow and drop row 3).
+    this.load.spritesheet("land-tiles", landUrl, { frameWidth: 197, frameHeight: 221 });
     this.load.image("vehicle-man", man1Url);
     this.load.image("vehicle-wheel", wheels1Url);
   }

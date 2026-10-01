@@ -35,7 +35,7 @@ function updateMovement(scene: GameScene, delta: number): void {
     facingDirection = "left";
     attemptedMovement = -moveSpeed * (delta / 1000);
 
-    if (scene.moveEnergy > 0 && scene.currentPlayer.canWalkOnTerrain()) {
+    if (scene.moveEnergy > 0 && scene.currentPlayer.canWalkDirection("left")) {
       movement = -moveSpeed * (delta / 1000);
     }
   }
@@ -44,7 +44,7 @@ function updateMovement(scene: GameScene, delta: number): void {
     facingDirection = "right";
     attemptedMovement = moveSpeed * (delta / 1000);
 
-    if (scene.moveEnergy > 0 && scene.currentPlayer.canWalkOnTerrain()) {
+    if (scene.moveEnergy > 0 && scene.currentPlayer.canWalkDirection("right")) {
       movement = moveSpeed * (delta / 1000);
     }
   }

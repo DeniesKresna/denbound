@@ -140,8 +140,8 @@ export class Player {
   public increaseAngle(delta: number): void {
     this.aimOffset += this.aimSpeedDegreesPerSecond * (delta / 1000);
 
-    if (this.aimOffset > 45) {
-      this.aimOffset = 45;
+    if (this.aimOffset > 50) {
+      this.aimOffset = 50;
     }
 
     this.updateCannonTransform();
@@ -150,8 +150,8 @@ export class Player {
   public decreaseAngle(delta: number): void {
     this.aimOffset -= this.aimSpeedDegreesPerSecond * (delta / 1000);
 
-    if (this.aimOffset < -45) {
-      this.aimOffset = -45;
+    if (this.aimOffset < -50) {
+      this.aimOffset = -50;
     }
 
     this.updateCannonTransform();
@@ -180,10 +180,12 @@ export class Player {
   }
 
   // Elevation is facing-independent: positive always means aiming upward.
+  // Terrain angle is Phaser's screen-space (clockwise) convention; negate it to match
+  // the math convention (counter-clockwise, y-up) used by the sin/cos tip/velocity formulas.
   private getCannonWorldAngle(): number {
     const terrainAngle = this.vehicle.getTerrainAngle();
 
-    return terrainAngle + this.aimOffset;
+    return -terrainAngle + this.aimOffset;
   }
 
   // Shared by the visual barrel and getCannonTip() so both match the projectile velocity formula.
@@ -249,8 +251,14 @@ export class Player {
     this.updateCannonTransform();
   }
 
-  public canWalkOnTerrain(): boolean {
-    return Math.abs(this.vehicle.getTerrainAngle()) < 85;
+  // Positive terrainAngle descends to the right (screen-space atan2), so each travel
+  // direction has its own uphill/downhill sense and its own climbable steepness limit.
+  public canWalkDirection(direction: PlayerDirection): boolean {
+    const terrainAngle = this.vehicle.getTerrainAngle();
+    const isDownhill = direction === "right" ? terrainAngle > 0 : terrainAngle < 0;
+    const maxAngle = isDownhill ? 89 : 60;
+
+    return Math.abs(terrainAngle) < maxAngle;
   }
 
   public getTerrainAngle(): number {
@@ -299,7 +307,7 @@ export class Player {
   }
 
   public getCollisionRadius(): number {
-    return Math.max(this.width, this.height) * 0.32;
+    return Math.max(this.width, this.height) * 0.48;
   }
 
   public setPowerPercent(percent: number): void {

@@ -16,7 +16,7 @@ export function finishShot(scene: GameScene): void {
 }
 
 export function explode(scene: GameScene, x: number, y: number): void {
-  const damageRadius = 70;
+  const damageRadius = 160;
   const craterRadius = 45;
 
   spawnVisualExplosion(scene, x, y);
@@ -31,7 +31,7 @@ export function explode(scene: GameScene, x: number, y: number): void {
 export function explodeOnPlayer(scene: GameScene, player: Player, x: number, y: number): void {
   const craterRadius = 45;
 
-  spawnVisualExplosion(scene, x, y);
+  spawnVisualExplosion(scene, x, y, 1.45);
 
   applyDirectHitDamage(player, x, y);
 
@@ -40,17 +40,18 @@ export function explodeOnPlayer(scene: GameScene, player: Player, x: number, y: 
   updatePlayersGroundPosition(scene);
 }
 
-function spawnVisualExplosion(scene: GameScene, x: number, y: number): void {
+function spawnVisualExplosion(scene: GameScene, x: number, y: number, sizeMultiplier = 1): void {
   const frameNames = ["explosion-1", "explosion-2", "explosion-3"];
   const explosion = scene.add.image(x, y, frameNames[0]);
+  const baseSize = 64 * sizeMultiplier;
 
   explosion.setOrigin(0.5, 0.5);
-  explosion.setDisplaySize(64, 64);
+  explosion.setDisplaySize(baseSize, baseSize);
   explosion.setDepth(9);
 
   scene.tweens.add({
     targets: explosion,
-    scale: { from: 0.85, to: 1.1 },
+    scale: { from: 0.85 * sizeMultiplier, to: 1.1 * sizeMultiplier },
     alpha: { from: 1, to: 1 },
     duration: 90,
     ease: "Linear",
@@ -62,7 +63,7 @@ function spawnVisualExplosion(scene: GameScene, x: number, y: number): void {
     }
 
     explosion.setTexture(frameNames[1]);
-    explosion.setDisplaySize(70, 70);
+    explosion.setDisplaySize(70 * sizeMultiplier, 70 * sizeMultiplier);
   });
 
   scene.time.delayedCall(180, () => {
@@ -71,7 +72,7 @@ function spawnVisualExplosion(scene: GameScene, x: number, y: number): void {
     }
 
     explosion.setTexture(frameNames[2]);
-    explosion.setDisplaySize(84, 84);
+    explosion.setDisplaySize(84 * sizeMultiplier, 84 * sizeMultiplier);
   });
 
   scene.time.delayedCall(270, () => {
@@ -80,12 +81,23 @@ function spawnVisualExplosion(scene: GameScene, x: number, y: number): void {
 }
 
 function applyDirectHitDamage(player: Player, impactX: number, impactY: number): void {
-  void impactX;
-  void impactY;
+  const distance = Phaser.Math.Distance.Between(
+    impactX,
+    impactY,
+    player.getCenterX(),
+    player.getCenterY(),
+  );
 
-  const directHitDamage = 200;
+  const maxDirectHitDamage = 200;
+  // A confirmed hit must always outdamage any near-miss splash, so it never falls below this.
+  const minDirectHitDamage = 140;
+  const directHitFalloffRadius = 100;
 
-  player.takeDamage(directHitDamage);
+  const damagePercent = Phaser.Math.Clamp(1 - distance / directHitFalloffRadius, 0, 1);
+
+  const damage = minDirectHitDamage + (maxDirectHitDamage - minDirectHitDamage) * damagePercent;
+
+  player.takeDamage(damage);
 }
 
 function applyExplosionDamage(
@@ -115,7 +127,8 @@ function applyDamageToPlayer(
     return;
   }
 
-  const maxDamage = 400;
+  // Kept below the direct-hit floor so a miss never outdamages an actual hit.
+  const maxDamage = 130;
 
   const damagePercent = 1 - distance / radius;
 
