@@ -1,0 +1,213 @@
+import Phaser from "phaser";
+
+export type VehicleFacingDirection = "left" | "right";
+
+export interface VehicleCharacterAppearance {
+  bodyKey: string;
+  riderKey: string;
+  wheelKey: string;
+  bodyTint?: number;
+  bodyWidth?: number;
+  bodyHeight?: number;
+  riderWidth?: number;
+  riderHeight?: number;
+  wheelSize?: number;
+  bodyOffsetY?: number;
+  riderOffsetY?: number;
+  wheelOffsetY?: number;
+  wheelOffsetX?: number;
+}
+
+export const DEFAULT_BLUE_CAR_APPEARANCE: VehicleCharacterAppearance = {
+  bodyKey: "vehicle-blue-car",
+  riderKey: "vehicle-man",
+  wheelKey: "vehicle-wheel",
+  bodyTint: 0xffffff,
+  bodyWidth: 136,
+  bodyHeight: 82,
+  riderWidth: 62,
+  riderHeight: 88,
+  wheelSize: 34,
+  bodyOffsetY: 34,
+  riderOffsetY: 55,
+  wheelOffsetY: 6,
+  wheelOffsetX: 40,
+};
+
+export class VehicleCharacter {
+  private readonly body: Phaser.GameObjects.Image;
+  private readonly rider: Phaser.GameObjects.Image;
+  private readonly rearWheel: Phaser.GameObjects.Image;
+  private readonly frontWheel: Phaser.GameObjects.Image;
+
+  public readonly width: number;
+  public readonly height: number;
+
+  private readonly bodyOffsetY: number;
+  private readonly riderOffsetY: number;
+  private readonly riderHandOffsetX: number;
+  private readonly riderHandOffsetY: number;
+  private readonly wheelOffsetY: number;
+  private readonly wheelOffsetX: number;
+
+  private direction: VehicleFacingDirection;
+  private baseX = 0;
+  private baseGroundY = 0;
+  private terrainAngle = 0;
+  private wheelSpin = 0;
+
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    groundY: number,
+    direction: VehicleFacingDirection,
+    appearance: VehicleCharacterAppearance,
+  ) {
+    this.direction = direction;
+
+    this.width = appearance.bodyWidth ?? DEFAULT_BLUE_CAR_APPEARANCE.bodyWidth ?? 136;
+    this.height = appearance.bodyHeight ?? DEFAULT_BLUE_CAR_APPEARANCE.bodyHeight ?? 82;
+
+    this.bodyOffsetY = appearance.bodyOffsetY ?? DEFAULT_BLUE_CAR_APPEARANCE.bodyOffsetY ?? 34;
+    this.riderOffsetY = appearance.riderOffsetY ?? DEFAULT_BLUE_CAR_APPEARANCE.riderOffsetY ?? 55;
+    this.riderHandOffsetX = this.width * 0.18;
+    this.riderHandOffsetY = this.height * 0.18;
+    this.wheelOffsetY = appearance.wheelOffsetY ?? DEFAULT_BLUE_CAR_APPEARANCE.wheelOffsetY ?? 6;
+    this.wheelOffsetX = appearance.wheelOffsetX ?? DEFAULT_BLUE_CAR_APPEARANCE.wheelOffsetX ?? 40;
+
+    const wheelSize = appearance.wheelSize ?? DEFAULT_BLUE_CAR_APPEARANCE.wheelSize ?? 34;
+    const riderWidth = appearance.riderWidth ?? DEFAULT_BLUE_CAR_APPEARANCE.riderWidth ?? 62;
+    const riderHeight = appearance.riderHeight ?? DEFAULT_BLUE_CAR_APPEARANCE.riderHeight ?? 88;
+
+    this.rearWheel = scene.add.image(0, 0, appearance.wheelKey);
+    this.rearWheel.setDisplaySize(wheelSize, wheelSize);
+    this.rearWheel.setOrigin(0.5, 0.5);
+
+    this.frontWheel = scene.add.image(0, 0, appearance.wheelKey);
+    this.frontWheel.setDisplaySize(wheelSize, wheelSize);
+    this.frontWheel.setOrigin(0.5, 0.5);
+
+    this.body = scene.add.image(0, 0, appearance.bodyKey);
+    this.body.setDisplaySize(this.width, this.height);
+    this.body.setOrigin(0.5, 0.5);
+    this.body.setTint(appearance.bodyTint ?? 0xffffff);
+
+    this.rider = scene.add.image(0, 0, appearance.riderKey);
+    this.rider.setDisplaySize(riderWidth, riderHeight);
+    this.rider.setOrigin(0.5, 0.5);
+
+    this.setDirection(direction);
+    this.setGroundPosition(x, groundY);
+
+    this.rider.setDepth(0);
+    this.body.setDepth(1);
+    this.rearWheel.setDepth(2);
+    this.frontWheel.setDepth(2);
+  }
+
+  public setDirection(direction: VehicleFacingDirection): void {
+    this.direction = direction;
+
+    const flipped = direction === "left";
+
+    this.body.setFlipX(flipped);
+    this.rider.setFlipX(flipped);
+
+    this.updateVisualRotation();
+  }
+
+  public setGroundPosition(x: number, groundY: number): void {
+    this.baseX = x;
+    this.baseGroundY = groundY;
+
+    this.body.setPosition(x, groundY - this.bodyOffsetY);
+    this.rider.setPosition(x, groundY - this.riderOffsetY);
+
+    this.rider.setDepth(0);
+    this.body.setDepth(1);
+    this.rearWheel.setDepth(2);
+    this.frontWheel.setDepth(2);
+
+    this.updateVisualRotation();
+  }
+
+  public setTerrainAngle(angle: number): void {
+    this.terrainAngle = angle;
+
+    this.updateVisualRotation();
+  }
+
+  public getTerrainAngle(): number {
+    return this.terrainAngle;
+  }
+
+  public getBodyCenter(): { x: number; y: number } {
+    return {
+      x: this.baseX,
+      y: this.baseGroundY - this.bodyOffsetY,
+    };
+  }
+
+  public getRiderHandPoint(): { x: number; y: number } {
+    const riderCenter = {
+      x: this.baseX,
+      y: this.baseGroundY - this.riderOffsetY,
+    };
+
+    const bodyRotation = Phaser.Math.DegToRad(this.terrainAngle);
+    const handLocalX = this.direction === "right" ? this.riderHandOffsetX : -this.riderHandOffsetX;
+    const handLocalY = this.riderHandOffsetY;
+    const handOffset = this.rotateOffset(handLocalX, handLocalY, bodyRotation);
+
+    return {
+      x: riderCenter.x + handOffset.x,
+      y: riderCenter.y + handOffset.y,
+    };
+  }
+
+  public roll(distance: number): void {
+    const wheelRadius = this.rearWheel.displayHeight / 2;
+    const circumference = Math.max(1, 2 * Math.PI * wheelRadius);
+
+    const wheelRotation = (distance / circumference) * 360;
+
+    this.wheelSpin += wheelRotation;
+
+    this.updateVisualRotation();
+  }
+
+  private updateVisualRotation(): void {
+    const wheelAngle = this.terrainAngle + this.wheelSpin;
+    const centerX = this.baseX;
+    const centerY = this.baseGroundY - this.bodyOffsetY;
+    const wheelLocalY = this.bodyOffsetY - this.wheelOffsetY;
+    const rotation = Phaser.Math.DegToRad(this.terrainAngle);
+
+    const frontLocalX = this.direction === "right" ? this.wheelOffsetX : -this.wheelOffsetX;
+    const rearLocalX = -frontLocalX;
+
+    const frontPosition = this.rotateOffset(frontLocalX, wheelLocalY, rotation);
+    const rearPosition = this.rotateOffset(rearLocalX, wheelLocalY, rotation);
+
+    this.body.setPosition(centerX, centerY);
+    this.rider.setPosition(centerX, this.baseGroundY - this.riderOffsetY);
+    this.frontWheel.setPosition(centerX + frontPosition.x, centerY + frontPosition.y);
+    this.rearWheel.setPosition(centerX + rearPosition.x, centerY + rearPosition.y);
+
+    this.body.setAngle(this.terrainAngle);
+    this.rider.setAngle(this.terrainAngle);
+    this.frontWheel.setAngle(wheelAngle);
+    this.rearWheel.setAngle(wheelAngle);
+  }
+
+  private rotateOffset(
+    offsetX: number,
+    offsetY: number,
+    rotation: number,
+  ): { x: number; y: number } {
+    return {
+      x: offsetX * Math.cos(rotation) - offsetY * Math.sin(rotation),
+      y: offsetX * Math.sin(rotation) + offsetY * Math.cos(rotation),
+    };
+  }
+}
