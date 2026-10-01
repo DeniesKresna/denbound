@@ -7,6 +7,12 @@ import bulletUrl from "../../assets/bullet.png";
 import explode1Url from "../../assets/explode-1.png";
 import explode2Url from "../../assets/explode-2.png";
 import explode3Url from "../../assets/explode-3.png";
+import smoke1Url from "../../assets/car/effect/smoke-1.png";
+import smoke2Url from "../../assets/car/effect/smoke-2.png";
+import smoke3Url from "../../assets/car/effect/smoke-3.png";
+import fired1Url from "../../assets/car/effect/fired-1.png";
+import fired2Url from "../../assets/car/effect/fired-2.png";
+import fired3Url from "../../assets/car/effect/fired-3.png";
 import landUrl from "../../assets/land4.png";
 import man1Url from "../../assets/man1.png";
 import wheels1Url from "../../assets/wheels1.png";
@@ -19,11 +25,10 @@ export class GameScene extends Phaser.Scene {
 
   public currentPlayer!: Player;
 
-  public turnText!: Phaser.GameObjects.Text;
-
   public cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
 
   public isShotInProgress = false;
+  public isGameOver = false;
 
   public wind = 0;
 
@@ -32,15 +37,12 @@ export class GameScene extends Phaser.Scene {
   public moveEnergy = 100;
   public readonly maxMoveEnergy = 100;
 
+  public readonly maxPower = 120;
+
   public terrainTiles: Phaser.GameObjects.Image[] = [];
   public explosionZones: { x: number; radius: number }[] = [];
 
-  private readonly terrainTileSize = 10;
-  private readonly grassTileFrame = 0;
-  private readonly dirtTileFrame = 18;
-  private readonly burntTileFrame = 27;
-
-  public terrainPoints = [
+  private readonly initialTerrainPoints = [
     { x: 0, y: 520 },
     { x: 150, y: 500 },
     { x: 300, y: 540 },
@@ -51,6 +53,13 @@ export class GameScene extends Phaser.Scene {
     { x: 1050, y: 470 },
     { x: 1280, y: 520 },
   ];
+
+  private readonly terrainTileSize = 10;
+  private readonly grassTileFrame = 0;
+  private readonly dirtTileFrame = 18;
+  private readonly burntTileFrame = 27;
+
+  public terrainPoints = this.initialTerrainPoints.map((point) => ({ ...point }));
 
   public spaceKey!: Phaser.Input.Keyboard.Key;
 
@@ -76,6 +85,12 @@ export class GameScene extends Phaser.Scene {
     this.load.image("explosion-1", explode1Url);
     this.load.image("explosion-2", explode2Url);
     this.load.image("explosion-3", explode3Url);
+    this.load.image("vehicle-smoke-1", smoke1Url);
+    this.load.image("vehicle-smoke-2", smoke2Url);
+    this.load.image("vehicle-smoke-3", smoke3Url);
+    this.load.image("vehicle-fired-1", fired1Url);
+    this.load.image("vehicle-fired-2", fired2Url);
+    this.load.image("vehicle-fired-3", fired3Url);
     // frameHeight must keep 4 full rows within the 887px source height (4 * 222 would overflow and drop row 3).
     this.load.spritesheet("land-tiles", landUrl, { frameWidth: 197, frameHeight: 221 });
     this.load.image("vehicle-man", man1Url);
@@ -115,6 +130,18 @@ export class GameScene extends Phaser.Scene {
         this.terrainTiles.push(tile);
       }
     }
+  }
+
+  public resetGameState(): void {
+    this.isShotInProgress = false;
+    this.isGameOver = false;
+    this.wind = 0;
+    this.moveEnergy = this.maxMoveEnergy;
+    this.power = 0;
+    this.isCharging = false;
+    this.projectile = undefined;
+    this.explosionZones = [];
+    this.terrainPoints = this.initialTerrainPoints.map((point) => ({ ...point }));
   }
 
   public getWindText(): string {
@@ -160,10 +187,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   public changeTurn(): void {
+    this.player1.setMoveBarVisible(false);
+    this.player2.setMoveBarVisible(false);
+
     if (this.currentPlayer === this.player1) {
+      this.player1.setTurnIndicatorVisible(false);
       this.currentPlayer = this.player2;
+      this.player2.setTurnIndicatorVisible(true);
     } else {
+      this.player2.setTurnIndicatorVisible(false);
       this.currentPlayer = this.player1;
+      this.player1.setTurnIndicatorVisible(true);
     }
   }
 

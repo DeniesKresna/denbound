@@ -3,6 +3,8 @@ import { Player } from "../entities/Player";
 import type { GameScene } from "./GameScene";
 
 export function initializeGame(scene: GameScene): void {
+  scene.resetGameState();
+
   createBackground(scene);
   createTerrain(scene);
 
@@ -36,12 +38,10 @@ export function initializeGame(scene: GameScene): void {
 
   scene.generateWind();
 
-  setupInput(scene);
+  scene.player1.setTurnIndicatorVisible(true);
+  scene.player2.setTurnIndicatorVisible(false);
 
-  scene.turnText = scene.add.text(20, 55, `Turn: ${scene.currentPlayer.name}`, {
-    fontSize: "24px",
-    color: "#ffffff",
-  });
+  setupInput(scene);
 
   scene.windText = scene.add.text(640, 35, scene.getWindText(), {
     fontSize: "22px",

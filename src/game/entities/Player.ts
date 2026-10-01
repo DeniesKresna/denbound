@@ -35,6 +35,9 @@ export class Player {
   private moveBarBackground: Phaser.GameObjects.Rectangle;
   private moveBarFill: Phaser.GameObjects.Rectangle;
 
+  private readonly turnIndicator: Phaser.GameObjects.Triangle;
+  private turnIndicatorColorToggle = false;
+
   private readonly nameText: Phaser.GameObjects.Text;
 
   private readonly aimSpeedDegreesPerSecond = 60;
@@ -103,6 +106,7 @@ export class Player {
     );
 
     this.powerBarBackground.setOrigin(0.5, 0.5);
+    this.powerBarBackground.setVisible(false);
 
     this.powerBarFill = this.scene.add.rectangle(
       x - barWidth / 2,
@@ -113,6 +117,7 @@ export class Player {
     );
 
     this.powerBarFill.setOrigin(0, 0.5);
+    this.powerBarFill.setVisible(false);
 
     this.moveBarBackground = this.scene.add.rectangle(
       x,
@@ -123,6 +128,7 @@ export class Player {
     );
 
     this.moveBarBackground.setOrigin(0.5, 0.5);
+    this.moveBarBackground.setVisible(false);
 
     this.moveBarFill = this.scene.add.rectangle(
       x - barWidth / 2,
@@ -133,6 +139,48 @@ export class Player {
     );
 
     this.moveBarFill.setOrigin(0, 0.5);
+    this.moveBarFill.setVisible(false);
+
+    this.turnIndicator = this.scene.add.triangle(
+      x,
+      y - this.height - 48,
+      0,
+      0,
+      22,
+      0,
+      11,
+      16,
+      0x16324f,
+    );
+
+    this.turnIndicator.setOrigin(0.5, 0.5);
+    this.turnIndicator.setDepth(6);
+    this.turnIndicator.setVisible(false);
+
+    this.scene.tweens.add({
+      targets: this.turnIndicator,
+      y: { from: this.turnIndicator.y - 3, to: this.turnIndicator.y + 3 },
+      angle: { from: -8, to: 8 },
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.inOut",
+    });
+
+    this.scene.time.addEvent({
+      delay: 300,
+      loop: true,
+      callback: () => {
+        if (!this.turnIndicator.visible) {
+          return;
+        }
+
+        this.turnIndicatorColorToggle = !this.turnIndicatorColorToggle;
+        const nextTint = this.turnIndicatorColorToggle ? 0x0d1f33 : 0x244a75;
+
+        this.turnIndicator.setFillStyle(nextTint);
+      },
+    });
 
     this.updateCannonTransform();
   }
@@ -242,6 +290,8 @@ export class Player {
 
     this.moveBarFill.setPosition(x - barWidth / 2, groundY - this.height - 12);
 
+    this.turnIndicator.setPosition(x, groundY - this.height - 48);
+
     this.updateCannonTransform();
   }
 
@@ -288,6 +338,8 @@ export class Player {
     if (this.hp < 0) {
       this.hp = 0;
     }
+
+    this.vehicle.setDamageEffects(this.getHPPercent());
   }
 
   public getHP(): number {
@@ -314,12 +366,47 @@ export class Player {
     const value = Phaser.Math.Clamp(percent, 0, 100);
 
     this.powerBarFill.width = this.statusBarWidth * (value / 100);
+
+    if (value <= 50) {
+      const ratio = value / 50;
+      const green = Phaser.Display.Color.IntegerToColor(0x2ecc71);
+      const yellow = Phaser.Display.Color.IntegerToColor(0xf1c40f);
+      const r = Phaser.Math.Linear(green.red, yellow.red, ratio);
+      const g = Phaser.Math.Linear(green.green, yellow.green, ratio);
+      const b = Phaser.Math.Linear(green.blue, yellow.blue, ratio);
+
+      this.powerBarFill.setFillStyle(Phaser.Display.Color.GetColor(r, g, b));
+      return;
+    }
+
+    const ratio = (value - 50) / 50;
+    const yellow = Phaser.Display.Color.IntegerToColor(0xf1c40f);
+    const red = Phaser.Display.Color.IntegerToColor(0x8b1e1e);
+    const r = Phaser.Math.Linear(yellow.red, red.red, ratio);
+    const g = Phaser.Math.Linear(yellow.green, red.green, ratio);
+    const b = Phaser.Math.Linear(yellow.blue, red.blue, ratio);
+
+    this.powerBarFill.setFillStyle(Phaser.Display.Color.GetColor(r, g, b));
+  }
+
+  public setPowerBarVisible(visible: boolean): void {
+    this.powerBarBackground.setVisible(visible);
+    this.powerBarFill.setVisible(visible);
   }
 
   public setMovePercent(percent: number): void {
     const value = Phaser.Math.Clamp(percent, 0, 100);
 
     this.moveBarFill.width = this.statusBarWidth * (value / 100);
+  }
+
+  public setMoveBarVisible(visible: boolean): void {
+    this.moveBarBackground.setVisible(visible);
+    this.moveBarFill.setVisible(visible);
+  }
+
+  public setTurnIndicatorVisible(visible: boolean): void {
+    this.turnIndicator.setVisible(visible);
   }
 
   public getHPPercent(): number {

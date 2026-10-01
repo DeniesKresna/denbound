@@ -4,6 +4,10 @@ import type { GameScene } from "./GameScene";
 
 export function finishShot(scene: GameScene): void {
   scene.time.delayedCall(500, () => {
+    if (scene.isGameOver) {
+      return;
+    }
+
     scene.changeTurn();
 
     scene.generateWind();
@@ -26,6 +30,8 @@ export function explode(scene: GameScene, x: number, y: number): void {
   destroyTerrain(scene, x, y, craterRadius);
 
   updatePlayersGroundPosition(scene);
+
+  evaluateGameOver(scene);
 }
 
 export function explodeOnPlayer(scene: GameScene, player: Player, x: number, y: number): void {
@@ -38,6 +44,8 @@ export function explodeOnPlayer(scene: GameScene, player: Player, x: number, y: 
   destroyTerrain(scene, x, y, craterRadius);
 
   updatePlayersGroundPosition(scene);
+
+  evaluateGameOver(scene);
 }
 
 function spawnVisualExplosion(scene: GameScene, x: number, y: number, sizeMultiplier = 1): void {
@@ -98,6 +106,33 @@ function applyDirectHitDamage(player: Player, impactX: number, impactY: number):
   const damage = minDirectHitDamage + (maxDirectHitDamage - minDirectHitDamage) * damagePercent;
 
   player.takeDamage(damage);
+}
+
+function evaluateGameOver(scene: GameScene): void {
+  if (scene.isGameOver) {
+    return;
+  }
+
+  const player1Dead = scene.player1.isDead();
+  const player2Dead = scene.player2.isDead();
+
+  if (!player1Dead && !player2Dead) {
+    return;
+  }
+
+  scene.isGameOver = true;
+  scene.isShotInProgress = false;
+  scene.isCharging = false;
+
+  let title = "DRAW!";
+
+  if (player1Dead && !player2Dead) {
+    title = `${scene.player2.name} MENANG!`;
+  } else if (player2Dead && !player1Dead) {
+    title = `${scene.player1.name} MENANG!`;
+  }
+
+  showGameOverPopup(scene, title);
 }
 
 function applyExplosionDamage(
@@ -187,4 +222,48 @@ function updatePlayersGroundPosition(scene: GameScene): void {
 
   scene.player2.setGroundPosition(player2X, scene.getTerrainY(player2X));
   scene.player2.setTerrainAngle(scene.getTerrainAngle(player2X));
+}
+
+function showGameOverPopup(scene: GameScene, title: string): void {
+  const { width, height } = scene.scale;
+  const backdrop = scene.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55);
+  backdrop.setDepth(100);
+
+  const panel = scene.add.rectangle(width / 2, height / 2, 520, 250, 0x16324f);
+  panel.setStrokeStyle(6, 0xffffff, 0.35);
+  panel.setDepth(101);
+
+  const winnerText = scene.add.text(width / 2, height / 2 - 55, title, {
+    fontSize: "38px",
+    color: "#ffffff",
+    fontStyle: "bold",
+    align: "center",
+  });
+  winnerText.setOrigin(0.5);
+  winnerText.setDepth(102);
+
+  const restartButton = scene.add.rectangle(width / 2, height / 2 + 55, 220, 56, 0x2ecc71);
+  restartButton.setStrokeStyle(4, 0xffffff, 0.4);
+  restartButton.setInteractive({ useHandCursor: true });
+  restartButton.setDepth(102);
+
+  const restartText = scene.add.text(width / 2, height / 2 + 55, "Main Ulang", {
+    fontSize: "24px",
+    color: "#0b1b14",
+    fontStyle: "bold",
+  });
+  restartText.setOrigin(0.5);
+  restartText.setDepth(103);
+
+  restartButton.on("pointerover", () => {
+    restartButton.setFillStyle(0x3ee280);
+  });
+
+  restartButton.on("pointerout", () => {
+    restartButton.setFillStyle(0x2ecc71);
+  });
+
+  restartButton.on("pointerup", () => {
+    scene.scene.restart();
+  });
 }

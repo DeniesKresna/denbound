@@ -8,6 +8,10 @@ export function progressGame(scene: GameScene, delta: number): void {
     return;
   }
 
+  if (scene.isGameOver) {
+    return;
+  }
+
   if (scene.projectile?.isActive()) {
     scene.projectile.update(delta);
     checkPlayerCollision(scene);
@@ -30,6 +34,7 @@ function updateMovement(scene: GameScene, delta: number): void {
   let movement = 0;
   let facingDirection = scene.currentPlayer.getDirection();
   let attemptedMovement = 0;
+  let isMoving = false;
 
   if (scene.cursors.left.isDown) {
     facingDirection = "left";
@@ -37,6 +42,7 @@ function updateMovement(scene: GameScene, delta: number): void {
 
     if (scene.moveEnergy > 0 && scene.currentPlayer.canWalkDirection("left")) {
       movement = -moveSpeed * (delta / 1000);
+      isMoving = true;
     }
   }
 
@@ -46,6 +52,7 @@ function updateMovement(scene: GameScene, delta: number): void {
 
     if (scene.moveEnergy > 0 && scene.currentPlayer.canWalkDirection("right")) {
       movement = moveSpeed * (delta / 1000);
+      isMoving = true;
     }
   }
 
@@ -68,6 +75,8 @@ function updateMovement(scene: GameScene, delta: number): void {
     }
   }
 
+  scene.currentPlayer.setMoveBarVisible(isMoving);
+
   const playerX = Phaser.Math.Clamp(scene.currentPlayer.getX(), 25, 1255);
 
   const terrainY = scene.getTerrainY(playerX);
@@ -88,21 +97,33 @@ function updateAngle(scene: GameScene, delta: number): void {
 }
 
 function updatePower(scene: GameScene, delta: number): void {
+  if (scene.isGameOver) {
+    return;
+  }
+
   if (Phaser.Input.Keyboard.JustDown(scene.spaceKey)) {
     scene.power = 0;
     scene.isCharging = true;
   }
 
   if (scene.isCharging && scene.spaceKey.isDown) {
-    scene.power += delta * 0.05;
+    scene.power += delta * 0.06;
 
-    if (scene.power > 100) {
-      scene.power = 100;
+    if (scene.power > scene.maxPower) {
+      scene.power = scene.maxPower;
     }
   }
 
+  const isPowerKeyHeld = scene.isCharging && scene.spaceKey.isDown;
+
+  scene.currentPlayer.setPowerBarVisible(isPowerKeyHeld);
+  scene.currentPlayer.setPowerPercent(
+    isPowerKeyHeld ? (scene.power / scene.maxPower) * 100 : 0,
+  );
+
   if (scene.isCharging && Phaser.Input.Keyboard.JustUp(scene.spaceKey)) {
     scene.isCharging = false;
+    scene.currentPlayer.setPowerBarVisible(false);
 
     if (scene.power > 0) {
       shoot(scene);
@@ -198,14 +219,7 @@ function checkPlayerCollision(scene: GameScene): void {
 }
 
 function updateHud(scene: GameScene): void {
-  scene.turnText.setText(`Turn: ${scene.currentPlayer.name}`);
-
   scene.windText.setText(scene.getWindText());
-
-  scene.player1.setPowerPercent(0);
-  scene.player2.setPowerPercent(0);
-
-  scene.currentPlayer.setPowerPercent(scene.power);
 
   scene.player1.setMovePercent(
     scene.currentPlayer === scene.player1 ? scene.moveEnergy : 100,

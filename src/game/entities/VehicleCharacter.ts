@@ -35,10 +35,14 @@ export const DEFAULT_BLUE_CAR_APPEARANCE: VehicleCharacterAppearance = {
 };
 
 export class VehicleCharacter {
+  private readonly scene: Phaser.Scene;
+
   private readonly body: Phaser.GameObjects.Image;
   private readonly rider: Phaser.GameObjects.Image;
   private readonly rearWheel: Phaser.GameObjects.Image;
   private readonly frontWheel: Phaser.GameObjects.Image;
+  private readonly smokeEffects: Phaser.GameObjects.Image[];
+  private readonly fireEffects: Phaser.GameObjects.Image[];
 
   public readonly width: number;
   public readonly height: number;
@@ -55,6 +59,8 @@ export class VehicleCharacter {
   private baseGroundY = 0;
   private terrainAngle = 0;
   private wheelSpin = 0;
+  private hpPercent = 100;
+  private damageEffectFrameIndex = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -63,6 +69,7 @@ export class VehicleCharacter {
     direction: VehicleFacingDirection,
     appearance: VehicleCharacterAppearance,
   ) {
+    this.scene = scene;
     this.direction = direction;
 
     this.width = appearance.bodyWidth ?? DEFAULT_BLUE_CAR_APPEARANCE.bodyWidth ?? 136;
@@ -87,6 +94,34 @@ export class VehicleCharacter {
     this.frontWheel.setDisplaySize(wheelSize, wheelSize);
     this.frontWheel.setOrigin(0.5, 0.5);
 
+    this.smokeEffects = [
+      scene.add.image(0, 0, "vehicle-smoke-1"),
+      scene.add.image(0, 0, "vehicle-smoke-2"),
+      scene.add.image(0, 0, "vehicle-smoke-3"),
+    ];
+
+    this.fireEffects = [
+      scene.add.image(0, 0, "vehicle-fired-1"),
+      scene.add.image(0, 0, "vehicle-fired-2"),
+      scene.add.image(0, 0, "vehicle-fired-3"),
+    ];
+
+    this.smokeEffects.forEach((effect) => {
+      effect.setOrigin(0.5, 0.5);
+      effect.setDisplaySize(56, 56);
+      effect.setAlpha(0.5);
+      effect.setDepth(10);
+      effect.setVisible(false);
+    });
+
+    this.fireEffects.forEach((effect) => {
+      effect.setOrigin(0.5, 0.5);
+      effect.setDisplaySize(46, 46);
+      effect.setAlpha(0.55);
+      effect.setDepth(11);
+      effect.setVisible(false);
+    });
+
     this.body = scene.add.image(0, 0, appearance.bodyKey);
     this.body.setDisplaySize(this.width, this.height);
     this.body.setOrigin(0.5, 0.5);
@@ -103,6 +138,16 @@ export class VehicleCharacter {
     this.body.setDepth(1);
     this.rearWheel.setDepth(2);
     this.frontWheel.setDepth(2);
+
+    this.scene.time.addEvent({
+      delay: 300,
+      loop: true,
+      callback: () => {
+        this.damageEffectFrameIndex = (this.damageEffectFrameIndex + 1) % 3;
+
+        this.updateDamageEffectsFrame();
+      },
+    });
   }
 
   public setDirection(direction: VehicleFacingDirection): void {
@@ -194,10 +239,23 @@ export class VehicleCharacter {
     this.frontWheel.setPosition(centerX + frontPosition.x, centerY + frontPosition.y);
     this.rearWheel.setPosition(centerX + rearPosition.x, centerY + rearPosition.y);
 
+    this.updateDamageEffectsPosition();
+
     this.body.setAngle(this.terrainAngle);
     this.rider.setAngle(this.terrainAngle);
     this.frontWheel.setAngle(wheelAngle);
     this.rearWheel.setAngle(wheelAngle);
+
+    this.smokeEffects.forEach((effect) => effect.setAngle(this.terrainAngle));
+    this.fireEffects.forEach((effect) => effect.setAngle(this.terrainAngle));
+  }
+
+  public setDamageEffects(hpPercent: number): void {
+    this.hpPercent = Phaser.Math.Clamp(hpPercent, 0, 100);
+
+    this.updateDamageEffectsVisibility();
+    this.updateDamageEffectsFrame();
+    this.updateDamageEffectsPosition();
   }
 
   private rotateOffset(
@@ -209,5 +267,54 @@ export class VehicleCharacter {
       x: offsetX * Math.cos(rotation) - offsetY * Math.sin(rotation),
       y: offsetX * Math.sin(rotation) + offsetY * Math.cos(rotation),
     };
+  }
+
+  private updateDamageEffectsPosition(): void {
+    const center = this.getBodyCenter();
+    const rotation = Phaser.Math.DegToRad(this.terrainAngle);
+    const facingMultiplier = this.direction === "right" ? 1 : -1;
+
+    const smokeOffset = this.rotateOffset(16 * facingMultiplier, -18, rotation);
+    const fireOffset = this.rotateOffset(6 * facingMultiplier, -8, rotation);
+    const frontFireOffset = this.rotateOffset(48 * facingMultiplier, 2, rotation);
+    const rearFireOffset = this.rotateOffset(-42 * facingMultiplier, 8, rotation);
+
+    this.smokeEffects.forEach((effect, index) => {
+      effect.setPosition(center.x + smokeOffset.x, center.y + smokeOffset.y - 4 + index * 2);
+    });
+
+    this.fireEffects[0].setPosition(center.x + fireOffset.x, center.y + fireOffset.y);
+    this.fireEffects[1].setPosition(center.x + frontFireOffset.x, center.y + frontFireOffset.y);
+    this.fireEffects[2].setPosition(center.x + rearFireOffset.x, center.y + rearFireOffset.y);
+  }
+
+  private updateDamageEffectsVisibility(): void {
+    const showSmoke = this.hpPercent <= 60;
+    const showFire = this.hpPercent <= 30;
+    const showFrontRearFire = this.hpPercent <= 10;
+
+    this.smokeEffects.forEach((effect) => effect.setVisible(showSmoke));
+    this.fireEffects[0].setVisible(showFire);
+    this.fireEffects[1].setVisible(showFrontRearFire);
+    this.fireEffects[2].setVisible(showFrontRearFire);
+  }
+
+  private updateDamageEffectsFrame(): void {
+    const smokeFrames = ["vehicle-smoke-1", "vehicle-smoke-2", "vehicle-smoke-3"];
+    const fireFrames = ["vehicle-fired-1", "vehicle-fired-2", "vehicle-fired-3"];
+
+    this.smokeEffects.forEach((effect, index) => {
+      effect.setTexture(smokeFrames[(this.damageEffectFrameIndex + index) % 3]);
+      effect.setAlpha(0.42);
+    });
+
+    this.fireEffects.forEach((effect, index) => {
+      effect.setTexture(fireFrames[(this.damageEffectFrameIndex + index) % 3]);
+      effect.setAlpha(0.5);
+    });
+
+    this.fireEffects[1].setDisplaySize(38, 38);
+    this.fireEffects[2].setDisplaySize(30, 30);
+    this.smokeEffects.forEach((effect) => effect.setDisplaySize(58, 58));
   }
 }
