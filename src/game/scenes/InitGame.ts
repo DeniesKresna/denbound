@@ -1,9 +1,11 @@
 import Phaser from "phaser";
 import { Player } from "../entities/Player";
 import type { GameScene } from "./GameScene";
+import { showSettingsPopup } from "./EndGame";
 
 export function initializeGame(scene: GameScene): void {
   scene.resetGameState();
+  scene.playGameMusic();
 
   createBackground(scene);
   createTerrain(scene);
@@ -53,7 +55,10 @@ export function initializeGame(scene: GameScene): void {
 }
 
 function createBackground(scene: GameScene): void {
-  scene.cameras.main.setBackgroundColor("#87CEEB");
+  const background = scene.add.image(640, 360, "green-lake-background");
+  background.setDisplaySize(1280, 720);
+  background.setDepth(-100);
+  background.setScrollFactor(0);
 }
 
 function createTerrain(scene: GameScene): void {
@@ -111,6 +116,43 @@ function createBattleHud(scene: GameScene): void {
   );
 
   scene.player2HpText.setOrigin(0.5);
+
+  createSettingsButton(scene);
+}
+
+function createSettingsButton(scene: GameScene): void {
+  const buttonSize = 28;
+  const buttonX = 1256;
+  const buttonY = 19;
+
+  const button = scene.add.rectangle(buttonX, buttonY, buttonSize, buttonSize, 0x16324f, 0.96);
+  button.setStrokeStyle(2, 0xffffff, 0.3);
+  button.setDepth(9);
+  button.setInteractive({ useHandCursor: true });
+
+  const icon = scene.add.text(buttonX, buttonY + 0.5, "settings", {
+    fontFamily: "Material Symbols Outlined",
+    fontSize: "18px",
+    color: "#ffffff",
+  });
+  icon.setOrigin(0.5);
+  icon.setDepth(10);
+
+  button.on("pointerover", () => {
+    button.setFillStyle(0x23405f, 1);
+  });
+
+  button.on("pointerout", () => {
+    button.setFillStyle(0x16324f, 0.96);
+  });
+
+  button.on("pointerup", () => {
+    if (scene.isGameOver || scene.isSettingsPopupOpen) {
+      return;
+    }
+
+    showSettingsPopup(scene);
+  });
 }
 
 function setupInput(scene: GameScene): void {

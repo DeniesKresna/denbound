@@ -24,6 +24,7 @@ export function explode(scene: GameScene, x: number, y: number): void {
   const craterRadius = 45;
 
   spawnVisualExplosion(scene, x, y);
+  scene.playBrickExplosionSound();
 
   applyExplosionDamage(scene, x, y, damageRadius);
 
@@ -38,6 +39,7 @@ export function explodeOnPlayer(scene: GameScene, player: Player, x: number, y: 
   const craterRadius = 45;
 
   spawnVisualExplosion(scene, x, y, 1.45);
+  scene.playExplosionSound();
 
   applyDirectHitDamage(player, x, y);
 
@@ -123,6 +125,8 @@ function evaluateGameOver(scene: GameScene): void {
   scene.isGameOver = true;
   scene.isShotInProgress = false;
   scene.isCharging = false;
+  scene.stopTruckSound();
+  scene.playGameOverMusic();
 
   let title = "DRAW!";
 
@@ -264,6 +268,212 @@ function showGameOverPopup(scene: GameScene, title: string): void {
   });
 
   restartButton.on("pointerup", () => {
+    scene.stopMusic();
     scene.scene.restart();
   });
+}
+
+export function showSettingsPopup(scene: GameScene): void {
+  if (scene.isSettingsPopupOpen) {
+    return;
+  }
+
+  scene.isSettingsPopupOpen = true;
+  scene.stopTruckSound();
+
+  const { width, height } = scene.scale;
+  const panelWidth = 620;
+  const panelHeight = 400;
+  const uiObjects: Phaser.GameObjects.GameObject[] = [];
+
+  const register = <T extends Phaser.GameObjects.GameObject>(object: T): T => {
+    uiObjects.push(object);
+
+    return object;
+  };
+
+  const closePopup = (): void => {
+    if (!scene.isSettingsPopupOpen) {
+      return;
+    }
+
+    scene.isSettingsPopupOpen = false;
+    uiObjects.forEach((object) => object.destroy());
+  };
+
+  register(scene.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55).setDepth(100));
+
+  register(scene.add.rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x16324f).setDepth(101));
+
+  const border = register(scene.add.rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x000000, 0));
+  border.setStrokeStyle(6, 0xffffff, 0.35);
+  border.setDepth(102);
+
+  register(
+    scene.add.text(width / 2 - 208, height / 2 - 162, "tune", {
+      fontFamily: "Material Symbols Outlined",
+      fontSize: "24px",
+      color: "#ffffff",
+    }).setOrigin(0.5).setDepth(103),
+  );
+
+  register(
+    scene.add.text(width / 2 - 166, height / 2 - 170, "PENGATURAN", {
+      fontSize: "28px",
+      color: "#ffffff",
+      fontStyle: "bold",
+    }).setOrigin(0, 0).setDepth(103),
+  );
+
+  const closeButton = register(scene.add.rectangle(width / 2 + 258, height / 2 - 160, 34, 34, 0x244a75));
+  closeButton.setStrokeStyle(2, 0xffffff, 0.25);
+  closeButton.setDepth(104);
+  closeButton.setInteractive({ useHandCursor: true });
+
+  register(
+    scene.add.text(width / 2 + 258, height / 2 - 159.5, "close", {
+      fontFamily: "Material Symbols Outlined",
+      fontSize: "20px",
+      color: "#ffffff",
+    }).setOrigin(0.5).setDepth(105),
+  );
+
+  closeButton.on("pointerover", () => {
+    closeButton.setFillStyle(0x2f5c8a, 1);
+  });
+
+  closeButton.on("pointerout", () => {
+    closeButton.setFillStyle(0x244a75, 1);
+  });
+
+  closeButton.on("pointerup", () => {
+    closePopup();
+  });
+
+  const createSlider = (
+    label: string,
+    iconName: string,
+    initialValue: number,
+    onChange: (value: number) => void,
+    y: number,
+  ): void => {
+    const labelX = width / 2 - 205;
+    const sliderX = width / 2 - 140;
+    const sliderWidth = 420;
+    const valueX = width / 2 + 240;
+
+    register(
+      scene.add.text(labelX, y - 8, iconName, {
+        fontFamily: "Material Symbols Outlined",
+        fontSize: "22px",
+        color: "#ffffff",
+      }).setOrigin(0, 0.5).setDepth(103),
+    );
+
+    register(
+      scene.add.text(labelX + 34, y - 8, label, {
+        fontSize: "19px",
+        color: "#ffffff",
+        fontStyle: "bold",
+      }).setOrigin(0, 0.5).setDepth(103),
+    );
+
+    const trackY = y + 18;
+    const track = register(scene.add.rectangle(sliderX, trackY, sliderWidth, 14, 0x0f2033).setOrigin(0, 0.5).setDepth(103));
+    const fill = register(scene.add.rectangle(sliderX, trackY, sliderWidth * initialValue, 14, 0x2ecc71).setOrigin(0, 0.5).setDepth(104));
+    const knob = register(scene.add.circle(sliderX + sliderWidth * initialValue, trackY, 10, 0xffffff).setDepth(105));
+    const hitArea = register(scene.add.rectangle(sliderX, trackY, sliderWidth, 34, 0xffffff, 0).setOrigin(0, 0.5).setDepth(106));
+    const valueText = register(
+      scene.add.text(valueX, y - 8, `${Math.round(initialValue * 100)}%`, {
+        fontSize: "17px",
+        color: "#d8e5f2",
+        fontStyle: "bold",
+      }).setOrigin(1, 0.5).setDepth(103),
+    );
+
+    let currentValue = initialValue;
+
+    const applyValue = (nextValue: number): void => {
+      currentValue = Phaser.Math.Clamp(nextValue, 0, 1);
+      fill.width = sliderWidth * currentValue;
+      knob.setPosition(sliderX + sliderWidth * currentValue, trackY);
+      valueText.setText(`${Math.round(currentValue * 100)}%`);
+      onChange(currentValue);
+    };
+
+    hitArea.setInteractive({ useHandCursor: true });
+    hitArea.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      applyValue((pointer.x - sliderX) / sliderWidth);
+    });
+
+    knob.setInteractive({ useHandCursor: true });
+    scene.input.setDraggable(knob);
+
+    knob.on("drag", (_pointer: Phaser.Input.Pointer, dragX: number) => {
+      applyValue((dragX - sliderX) / sliderWidth);
+    });
+
+    track.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      applyValue((pointer.x - sliderX) / sliderWidth);
+    });
+
+    applyValue(initialValue);
+  };
+
+  createSlider(
+    "Musik Latar",
+    "music_note",
+    scene.backgroundMusicVolume,
+    (value) => scene.setBackgroundMusicVolume(value),
+    height / 2 - 68,
+  );
+
+  createSlider(
+    "Efek Suara",
+    "volume_up",
+    scene.soundEffectVolume,
+    (value) => scene.setSoundEffectVolume(value),
+    height / 2 + 24,
+  );
+
+  const doneButton = register(scene.add.rectangle(width / 2, height / 2 + 142, 180, 54, 0x2ecc71));
+  doneButton.setStrokeStyle(4, 0xffffff, 0.35);
+  doneButton.setInteractive({ useHandCursor: true });
+  doneButton.setDepth(104);
+
+  register(
+    scene.add.text(width / 2, height / 2 + 142, "Tutup", {
+      fontSize: "22px",
+      color: "#0b1b14",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(105),
+  );
+
+  doneButton.on("pointerover", () => {
+    doneButton.setFillStyle(0x3ee280);
+  });
+
+  doneButton.on("pointerout", () => {
+    doneButton.setFillStyle(0x2ecc71);
+  });
+
+  doneButton.on("pointerup", () => {
+    closePopup();
+  });
+
+  register(
+    scene.add.text(width / 2, height / 2 + 192, "Perubahan volume berlaku langsung.", {
+      fontSize: "15px",
+      color: "#d8e5f2",
+    }).setOrigin(0.5).setDepth(103),
+  );
+
+  const backdrop = uiObjects[0];
+
+  if (backdrop instanceof Phaser.GameObjects.Rectangle) {
+    backdrop.setInteractive();
+    backdrop.on("pointerup", () => {
+      closePopup();
+    });
+  }
 }

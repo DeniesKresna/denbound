@@ -8,8 +8,12 @@ export function progressGame(scene: GameScene, delta: number): void {
     return;
   }
 
-  if (scene.isGameOver) {
+  if (scene.isGameOver || scene.isSettingsPopupOpen) {
     return;
+  }
+
+  if (scene.isShotInProgress) {
+    scene.stopTruckSound();
   }
 
   if (scene.projectile?.isActive()) {
@@ -75,6 +79,12 @@ function updateMovement(scene: GameScene, delta: number): void {
     }
   }
 
+  if (isMoving) {
+    scene.playTruckSound();
+  } else {
+    scene.stopTruckSound();
+  }
+
   scene.currentPlayer.setMoveBarVisible(isMoving);
 
   const playerX = Phaser.Math.Clamp(scene.currentPlayer.getX(), 25, 1255);
@@ -137,6 +147,8 @@ function shoot(scene: GameScene): void {
   }
 
   scene.isShotInProgress = true;
+  scene.stopTruckSound();
+  scene.playProjectileSound();
 
   const angle = scene.currentPlayer.getAngle();
 

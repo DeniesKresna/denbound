@@ -14,6 +14,13 @@ import fired1Url from "../../assets/car/effect/fired-1.png";
 import fired2Url from "../../assets/car/effect/fired-2.png";
 import fired3Url from "../../assets/car/effect/fired-3.png";
 import landUrl from "../../assets/land4.png";
+import greenLakeUrl from "../../assets/wallpaper/green-lake.png";
+import projectileSfxUrl from "../../assets/music/projectile.mp3";
+import truckSfxUrl from "../../assets/music/truck.mp3";
+import brickExplodeSfxUrl from "../../assets/music/brick-explode.mp3";
+import explodeSfxUrl from "../../assets/music/explode.mp3";
+import dagoredUrl from "../../assets/music/dagored.mp3";
+import pufinoUrl from "../../assets/music/pufino.mp3";
 import man1Url from "../../assets/man1.png";
 import wheels1Url from "../../assets/wheels1.png";
 import { initializeGame } from "./InitGame";
@@ -74,6 +81,15 @@ export class GameScene extends Phaser.Scene {
   public player1HpText!: Phaser.GameObjects.Text;
   public player2HpText!: Phaser.GameObjects.Text;
 
+  public isSettingsPopupOpen = false;
+
+  public backgroundMusicVolume = 0.5;
+  public soundEffectVolume = 0.55;
+
+  private gameMusic?: Phaser.Sound.BaseSound;
+  private gameOverMusic?: Phaser.Sound.BaseSound;
+  private truckSound?: Phaser.Sound.BaseSound;
+
   constructor() {
     super("GameScene");
   }
@@ -91,6 +107,13 @@ export class GameScene extends Phaser.Scene {
     this.load.image("vehicle-fired-1", fired1Url);
     this.load.image("vehicle-fired-2", fired2Url);
     this.load.image("vehicle-fired-3", fired3Url);
+    this.load.image("green-lake-background", greenLakeUrl);
+    this.load.audio("truck-sfx", truckSfxUrl);
+    this.load.audio("brick-explode-sfx", brickExplodeSfxUrl);
+    this.load.audio("explode-sfx", explodeSfxUrl);
+    this.load.audio("projectile-sfx", projectileSfxUrl);
+    this.load.audio("dagored-music", dagoredUrl);
+    this.load.audio("pufino-music", pufinoUrl);
     // frameHeight must keep 4 full rows within the 887px source height (4 * 222 would overflow and drop row 3).
     this.load.spritesheet("land-tiles", landUrl, { frameWidth: 197, frameHeight: 221 });
     this.load.image("vehicle-man", man1Url);
@@ -142,6 +165,104 @@ export class GameScene extends Phaser.Scene {
     this.projectile = undefined;
     this.explosionZones = [];
     this.terrainPoints = this.initialTerrainPoints.map((point) => ({ ...point }));
+    this.stopTruckSound();
+  }
+
+  public playGameMusic(): void {
+    this.stopMusic();
+
+    this.gameMusic = this.sound.add("dagored-music", {
+      loop: true,
+      volume: this.backgroundMusicVolume,
+    });
+
+    this.gameMusic.play();
+  }
+
+  public playGameOverMusic(): void {
+    if (this.gameOverMusic?.isPlaying) {
+      return;
+    }
+
+    this.gameMusic?.stop();
+
+    this.gameOverMusic = this.sound.add("pufino-music", {
+      loop: true,
+      volume: this.backgroundMusicVolume,
+    });
+
+    this.gameOverMusic.play();
+  }
+
+  public stopMusic(): void {
+    this.gameMusic?.stop();
+    this.gameOverMusic?.stop();
+
+    this.gameMusic?.destroy();
+    this.gameOverMusic?.destroy();
+
+    this.gameMusic = undefined;
+    this.gameOverMusic = undefined;
+  }
+
+  public playTruckSound(): void {
+    if (!this.truckSound) {
+      this.truckSound = this.sound.add("truck-sfx", {
+        loop: true,
+        volume: this.getSoundEffectVolume(0.82),
+      });
+    }
+
+    if (!this.truckSound.isPlaying) {
+      this.truckSound.play();
+    }
+  }
+
+  public stopTruckSound(): void {
+    if (!this.truckSound) {
+      return;
+    }
+
+    this.truckSound.stop();
+  }
+
+  public playProjectileSound(): void {
+    this.sound.play("projectile-sfx", { volume: this.getSoundEffectVolume() });
+  }
+
+  public playBrickExplosionSound(): void {
+    this.sound.play("brick-explode-sfx", { volume: this.getSoundEffectVolume(1.18) });
+  }
+
+  public playExplosionSound(): void {
+    this.sound.play("explode-sfx", { volume: this.getSoundEffectVolume(1.27) });
+  }
+
+  public setBackgroundMusicVolume(volume: number): void {
+    this.backgroundMusicVolume = Phaser.Math.Clamp(volume, 0, 1);
+
+    this.updateSoundVolume(this.gameMusic, this.backgroundMusicVolume);
+    this.updateSoundVolume(this.gameOverMusic, this.backgroundMusicVolume);
+  }
+
+  public setSoundEffectVolume(volume: number): void {
+    this.soundEffectVolume = Phaser.Math.Clamp(volume, 0, 1);
+
+    this.updateSoundVolume(this.truckSound, this.getSoundEffectVolume(0.82));
+  }
+
+  private getSoundEffectVolume(multiplier = 1): number {
+    return Phaser.Math.Clamp(this.soundEffectVolume * multiplier, 0, 1);
+  }
+
+  private updateSoundVolume(sound: Phaser.Sound.BaseSound | undefined, volume: number): void {
+    if (!sound) {
+      return;
+    }
+
+    (sound as Phaser.Sound.BaseSound & {
+      setVolume(volume: number): void;
+    }).setVolume(volume);
   }
 
   public getWindText(): string {
