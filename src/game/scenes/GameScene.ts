@@ -38,7 +38,7 @@ export class GameScene extends Phaser.Scene {
 
   public wind = 0;
 
-  public windText!: Phaser.GameObjects.Text;
+  public windIndicator!: Phaser.GameObjects.Graphics;
 
   public moveEnergy = 100;
   public readonly maxMoveEnergy = 100;
@@ -247,6 +247,7 @@ export class GameScene extends Phaser.Scene {
     this.isShotInProgress = false;
     this.isGameOver = false;
     this.wind = 0;
+    this.terrainGraphics = undefined;
     this.moveEnergy = this.maxMoveEnergy;
     this.power = 0;
     this.isCharging = false;
@@ -353,16 +354,72 @@ export class GameScene extends Phaser.Scene {
     }).setVolume(volume);
   }
 
-  public getWindText(): string {
-    if (this.wind < 0) {
-      return `WIND\n← ${Math.abs(this.wind)}`;
+  public updateWindIndicator(): void {
+    if (!this.windIndicator) {
+      return;
     }
 
-    if (this.wind > 0) {
-      return `WIND\n${this.wind} →`;
-    }
+    const graphics = this.windIndicator;
+    const strength = Math.abs(this.wind) / 10;
+    const direction = Math.sign(this.wind);
+    const flagLength = this.wind === 0 ? 24 : 20 + strength * 26;
+    const flapAmplitude = strength * 9;
+    const flapSpeed = 3 + strength * 12;
+    const phase = (this.time.now / 1000) * flapSpeed;
+    const baseX = 3;
 
-    return "WIND\n0";
+    graphics.clear();
+    graphics.lineStyle(2, 0xffffff, 0.9);
+    graphics.beginPath();
+    graphics.moveTo(0, -15);
+    graphics.lineTo(0, 15);
+    graphics.strokePath();
+
+    const flagPoint = (progress: number, edge: number): { x: number; y: number } => {
+      const wave = Math.sin(phase - progress * 5) * flapAmplitude * progress;
+      const halfHeight = 8 * (1 - progress * 0.2);
+
+      if (direction === 0) {
+        return {
+          x: baseX + edge * halfHeight,
+          y: progress * flagLength,
+        };
+      }
+
+      return {
+        x: baseX + direction * flagLength * progress,
+        y: wave + edge * halfHeight,
+      };
+    };
+
+    graphics.fillStyle(0xffffff, 0.95);
+    graphics.beginPath();
+    for (let step = 0; step <= 8; step++) {
+      const point = flagPoint(step / 8, -1);
+      if (step === 0) {
+        graphics.moveTo(point.x, point.y);
+      } else {
+        graphics.lineTo(point.x, point.y);
+      }
+    }
+    for (let step = 8; step >= 0; step--) {
+      const point = flagPoint(step / 8, 1);
+      graphics.lineTo(point.x, point.y);
+    }
+    graphics.closePath();
+    graphics.fillPath();
+
+    graphics.lineStyle(2, 0x2ecc71, 0.95);
+    graphics.beginPath();
+    for (let step = 1; step <= 6; step++) {
+      const point = flagPoint(step / 8, 0);
+      if (step === 1) {
+        graphics.moveTo(point.x, point.y);
+      } else {
+        graphics.lineTo(point.x, point.y);
+      }
+    }
+    graphics.strokePath();
   }
 
   public getTerrainY(x: number): number {

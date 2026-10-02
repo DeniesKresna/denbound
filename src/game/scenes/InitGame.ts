@@ -50,15 +50,11 @@ export function initializeGame(scene: GameScene): void {
 
   setupInput(scene);
 
-  scene.windText = scene.add.text(640, 35, scene.getWindText(), {
-    fontSize: "22px",
-    color: "#ffffff",
-    align: "center",
-  });
-
-  scene.windText.setOrigin(0.5);
-  scene.windText.setScrollFactor(0);
-  scene.uiObjects.add(scene.windText);
+  scene.windIndicator = scene.add.graphics();
+  scene.windIndicator.setPosition(640, 35);
+  scene.windIndicator.setScrollFactor(0);
+  scene.uiObjects.add(scene.windIndicator);
+  scene.updateWindIndicator();
 
   scene.syncCameraIgnoreLists();
   scene.syncCamera(true);
@@ -89,12 +85,19 @@ function createBattleHud(scene: GameScene): void {
     color: "#ffffff",
   }).setScrollFactor(0));
 
-  register(scene.add.rectangle(30, 42, barWidth, barHeight, 0x222222).setOrigin(0, 0.5).setScrollFactor(0));
+  register(scene.add.rectangle(30, 42, barWidth, barHeight, 0x222222).setOrigin(0, 0.5).setScrollFactor(0).setDepth(1));
 
   scene.player1HpBar = register(scene.add.rectangle(30, 42, barWidth, barHeight, 0x2ecc71));
 
   scene.player1HpBar.setOrigin(0, 0.5);
   scene.player1HpBar.setScrollFactor(0);
+  scene.player1HpBar.setDepth(2);
+
+  const player1HpBorder = register(scene.add.rectangle(30, 42, barWidth, barHeight, 0x000000, 0));
+  player1HpBorder.setOrigin(0, 0.5);
+  player1HpBorder.setStrokeStyle(2, 0xffffff, 0.9);
+  player1HpBorder.setScrollFactor(0);
+  player1HpBorder.setDepth(3);
 
   scene.player1HpText = register(scene.add.text(
     30 + barWidth / 2,
@@ -108,6 +111,7 @@ function createBattleHud(scene: GameScene): void {
 
   scene.player1HpText.setOrigin(0.5);
   scene.player1HpText.setScrollFactor(0);
+  scene.player1HpText.setDepth(4);
 
   register(
     scene
@@ -119,12 +123,19 @@ function createBattleHud(scene: GameScene): void {
     .setScrollFactor(0),
   );
 
-  register(scene.add.rectangle(1250, 42, barWidth, barHeight, 0x222222).setOrigin(1, 0.5).setScrollFactor(0));
+  register(scene.add.rectangle(1250, 42, barWidth, barHeight, 0x222222).setOrigin(1, 0.5).setScrollFactor(0).setDepth(1));
 
   scene.player2HpBar = register(scene.add.rectangle(1250, 42, barWidth, barHeight, 0x2ecc71));
 
   scene.player2HpBar.setOrigin(1, 0.5);
   scene.player2HpBar.setScrollFactor(0);
+  scene.player2HpBar.setDepth(2);
+
+  const player2HpBorder = register(scene.add.rectangle(1250, 42, barWidth, barHeight, 0x000000, 0));
+  player2HpBorder.setOrigin(1, 0.5);
+  player2HpBorder.setStrokeStyle(2, 0xffffff, 0.9);
+  player2HpBorder.setScrollFactor(0);
+  player2HpBorder.setDepth(3);
 
   scene.player2HpText = register(scene.add.text(
     1250 - barWidth / 2,
@@ -138,6 +149,7 @@ function createBattleHud(scene: GameScene): void {
 
   scene.player2HpText.setOrigin(0.5);
   scene.player2HpText.setScrollFactor(0);
+  scene.player2HpText.setDepth(4);
 
   createSettingsButton(scene);
 }

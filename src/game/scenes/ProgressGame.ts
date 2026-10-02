@@ -234,7 +234,7 @@ function checkPlayerCollision(scene: GameScene): void {
 }
 
 function updateHud(scene: GameScene): void {
-  scene.windText.setText(scene.getWindText());
+  scene.updateWindIndicator();
 
   scene.player1.setMovePercent(
     scene.currentPlayer === scene.player1 ? scene.moveEnergy : 100,
