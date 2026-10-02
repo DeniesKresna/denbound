@@ -100,6 +100,9 @@ export class GameScene extends Phaser.Scene {
   public player2HpText!: Phaser.GameObjects.Text;
 
   public uiCamera!: Phaser.Cameras.Scene2D.Camera;
+  // Objects registered here render only on uiCamera; everything else renders only on the world camera.
+  // Re-split every frame via syncCameraIgnoreLists() so late-created objects (bullets, explosions) don't double-render.
+  public uiObjects = new Set<Phaser.GameObjects.GameObject>();
 
   public isSettingsPopupOpen = false;
 
@@ -441,5 +444,19 @@ export class GameScene extends Phaser.Scene {
 
     camera.setZoom(currentZoom);
     camera.centerOn(targetCenterX, targetCenterY);
+  }
+
+  // Objects created after uiObjects was last populated (bullets, explosion fx) default to
+  // rendering on both cameras; re-split on every list change so neither camera shows the wrong set.
+  public syncCameraIgnoreLists(): void {
+    if (!this.uiCamera) {
+      return;
+    }
+
+    const uiList = Array.from(this.uiObjects);
+    const worldList = this.children.list.filter((child) => !this.uiObjects.has(child));
+
+    this.cameras.main.ignore(uiList);
+    this.uiCamera.ignore(worldList);
   }
 }

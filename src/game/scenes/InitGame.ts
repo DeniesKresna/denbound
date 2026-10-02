@@ -36,8 +36,6 @@ export function initializeGame(scene: GameScene): void {
     "left",
   );
 
-  scene.uiCamera.ignore(scene.children.list);
-
   createBattleHud(scene);
 
   scene.player1.setTerrainAngle(scene.getTerrainAngle(player1X));
@@ -60,8 +58,9 @@ export function initializeGame(scene: GameScene): void {
 
   scene.windText.setOrigin(0.5);
   scene.windText.setScrollFactor(0);
-  scene.cameras.main.ignore(scene.windText);
+  scene.uiObjects.add(scene.windText);
 
+  scene.syncCameraIgnoreLists();
   scene.syncCamera(true);
 }
 
@@ -78,10 +77,9 @@ function createTerrain(scene: GameScene): void {
 function createBattleHud(scene: GameScene): void {
   const barWidth = 400;
   const barHeight = 24;
-  const uiObjects: Phaser.GameObjects.GameObject[] = [];
 
   const register = <T extends Phaser.GameObjects.GameObject>(object: T): T => {
-    uiObjects.push(object);
+    scene.uiObjects.add(object);
 
     return object;
   };
@@ -141,14 +139,12 @@ function createBattleHud(scene: GameScene): void {
   scene.player2HpText.setOrigin(0.5);
   scene.player2HpText.setScrollFactor(0);
 
-  createSettingsButton(scene, uiObjects);
-
-  scene.cameras.main.ignore(uiObjects);
+  createSettingsButton(scene);
 }
 
-function createSettingsButton(scene: GameScene, uiObjects: Phaser.GameObjects.GameObject[]): void {
+function createSettingsButton(scene: GameScene): void {
   const register = <T extends Phaser.GameObjects.GameObject>(object: T): T => {
-    uiObjects.push(object);
+    scene.uiObjects.add(object);
 
     return object;
   };

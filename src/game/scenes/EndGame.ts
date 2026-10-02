@@ -230,10 +230,9 @@ function updatePlayersGroundPosition(scene: GameScene): void {
 
 function showGameOverPopup(scene: GameScene, title: string): void {
   const { width, height } = scene.scale;
-  const uiObjects: Phaser.GameObjects.GameObject[] = [];
 
   const register = <T extends Phaser.GameObjects.GameObject>(object: T): T => {
-    uiObjects.push(object);
+    scene.uiObjects.add(object);
 
     return object;
   };
@@ -281,7 +280,7 @@ function showGameOverPopup(scene: GameScene, title: string): void {
     scene.scene.restart();
   });
 
-  scene.cameras.main.ignore(uiObjects);
+  scene.syncCameraIgnoreLists();
 }
 
 export function showSettingsPopup(scene: GameScene): void {
@@ -299,6 +298,7 @@ export function showSettingsPopup(scene: GameScene): void {
 
   const register = <T extends Phaser.GameObjects.GameObject>(object: T): T => {
     uiObjects.push(object);
+    scene.uiObjects.add(object);
 
     return object;
   };
@@ -309,7 +309,10 @@ export function showSettingsPopup(scene: GameScene): void {
     }
 
     scene.isSettingsPopupOpen = false;
-    uiObjects.forEach((object) => object.destroy());
+    uiObjects.forEach((object) => {
+      scene.uiObjects.delete(object);
+      object.destroy();
+    });
   };
 
   register(scene.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55).setDepth(100));
@@ -488,5 +491,5 @@ export function showSettingsPopup(scene: GameScene): void {
     });
   }
 
-  scene.cameras.main.ignore(uiObjects);
+  scene.syncCameraIgnoreLists();
 }

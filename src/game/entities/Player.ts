@@ -42,6 +42,9 @@ export class Player {
 
   private readonly aimSpeedDegreesPerSecond = 60;
   private aimOffset = 0;
+  // Large enough that even on the steepest clamped terrain (±65°, see getCannonWorldAngle)
+  // there's still real elevation left over after cancelling the slope, not just enough to level out.
+  private readonly maxAimOffset = 100;
 
   private readonly vehicleAppearance: VehicleCharacterAppearance;
   private readonly cannonLineLength = 42;
@@ -188,8 +191,8 @@ export class Player {
   public increaseAngle(delta: number): void {
     this.aimOffset += this.aimSpeedDegreesPerSecond * (delta / 1000);
 
-    if (this.aimOffset > 50) {
-      this.aimOffset = 50;
+    if (this.aimOffset > this.maxAimOffset) {
+      this.aimOffset = this.maxAimOffset;
     }
 
     this.updateCannonTransform();
@@ -198,8 +201,8 @@ export class Player {
   public decreaseAngle(delta: number): void {
     this.aimOffset -= this.aimSpeedDegreesPerSecond * (delta / 1000);
 
-    if (this.aimOffset < -50) {
-      this.aimOffset = -50;
+    if (this.aimOffset < -this.maxAimOffset) {
+      this.aimOffset = -this.maxAimOffset;
     }
 
     this.updateCannonTransform();
@@ -210,20 +213,19 @@ export class Player {
   }
 
   private updateCannonTransform(): void {
-    const worldAngle = this.getCannonWorldAngle();
-    const facingDirection = this.direction === "right" ? 1 : -1;
-    // Flip mirrors the texture, so the rotation must be un-mirrored to match (negate again for left facing).
-    const visualAngle = -worldAngle * facingDirection;
     const handPoint = this.vehicle.getRiderHandPoint();
     const tipOffset = this.getCannonTipOffset();
+    // Rotate straight to the tip vector's own angle instead of flipping the sprite: the cannon
+    // texture has a pivot knob on its left and the muzzle on its right, and tipOffset already
+    // encodes left/right correctly (via facingDirection on x), so this needs no separate flip.
+    const visualAngle = Phaser.Math.RadToDeg(Math.atan2(tipOffset.y, tipOffset.x));
 
-    // Center origin keeps flipX from shifting the sprite's anchor point off-screen.
+    // Center origin keeps rotation from shifting the sprite's anchor point off-screen.
     this.cannon.setPosition(
       handPoint.x + tipOffset.x / 2,
       handPoint.y + tipOffset.y / 2,
     );
     this.cannon.setAngle(visualAngle);
-    this.cannon.setFlipX(this.direction === "left");
     this.cannon.setDepth(4);
   }
 
@@ -232,10 +234,15 @@ export class Player {
   // the math convention (counter-clockwise, y-up) used by the sin/cos tip/velocity formulas.
   private getCannonWorldAngle(): number {
     const terrainAngle = this.vehicle.getTerrainAngle();
-    const rawAngle = -terrainAngle + this.aimOffset;
 
-    // On steep crater walls terrainAngle can near 90°, and without this clamp
-    // rawAngle crosses ±90° so cos() flips sign and the barrel swings backward into the vehicle.
+    // canWalkDirection lets the vehicle rest on near-vertical crater walls (up to 89°), but the
+    // -terrainAngle compensation below would then swing the barrel to a matching extreme. Clamp
+    // the terrain contribution first so the gun never over-reacts to slopes steeper than this.
+    const clampedTerrainAngle = Phaser.Math.Clamp(terrainAngle, -65, 65);
+    const rawAngle = -clampedTerrainAngle + this.aimOffset;
+
+    // On steep slopes rawAngle could still cross ±90° once aimOffset is added, flipping cos()'s
+    // sign and swinging the barrel backward into the vehicle - clamp the combined result too.
     return Phaser.Math.Clamp(rawAngle, -80, 80);
   }
 

@@ -30,6 +30,7 @@ export function progressGame(scene: GameScene, delta: number): void {
 
   updateHud(scene);
 
+  scene.syncCameraIgnoreLists();
   scene.syncCamera(false, delta);
 }
 

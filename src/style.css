@@ -50,8 +50,13 @@
   }
 }
 
+html {
+  overflow: auto;
+}
+
 body {
   margin: 0;
+  overflow: auto;
 }
 
 h1,
