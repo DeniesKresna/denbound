@@ -13,8 +13,7 @@ import smoke3Url from "../../assets/car/effect/smoke-3.png";
 import fired1Url from "../../assets/car/effect/fired-1.png";
 import fired2Url from "../../assets/car/effect/fired-2.png";
 import fired3Url from "../../assets/car/effect/fired-3.png";
-import landUrl from "../../assets/land4.png";
-import greenLakeUrl from "../../assets/wallpaper/green-lake.png";
+import hillUrl from "../../assets/wallpaper/hill.png";
 import projectileSfxUrl from "../../assets/music/projectile.mp3";
 import truckSfxUrl from "../../assets/music/truck.mp3";
 import brickExplodeSfxUrl from "../../assets/music/brick-explode.mp3";
@@ -46,25 +45,44 @@ export class GameScene extends Phaser.Scene {
 
   public readonly maxPower = 120;
 
-  public terrainTiles: Phaser.GameObjects.Image[] = [];
+  public readonly worldWidth = 1920;
+  public readonly worldHeight = 1400;
+
   public explosionZones: { x: number; radius: number }[] = [];
 
   private readonly initialTerrainPoints = [
-    { x: 0, y: 520 },
-    { x: 150, y: 500 },
-    { x: 300, y: 540 },
-    { x: 450, y: 470 },
-    { x: 600, y: 510 },
-    { x: 750, y: 450 },
-    { x: 900, y: 500 },
-    { x: 1050, y: 470 },
-    { x: 1280, y: 520 },
+    { x: 0, y: 1185 },
+    { x: 130, y: 1165 },
+    { x: 260, y: 1215 },
+    { x: 400, y: 1145 },
+    { x: 560, y: 1205 },
+    { x: 710, y: 1120 },
+    { x: 860, y: 1185 },
+    { x: 1010, y: 1105 },
+    { x: 1140, y: 1180 },
+    { x: 1280, y: 1130 },
+    { x: 1440, y: 1220 },
+    { x: 1580, y: 1140 },
+    { x: 1710, y: 1195 },
+    { x: 1860, y: 1155 },
+    { x: 1920, y: 1175 },
   ];
 
-  private readonly terrainTileSize = 10;
-  private readonly grassTileFrame = 0;
-  private readonly dirtTileFrame = 18;
-  private readonly burntTileFrame = 27;
+  private terrainGraphics?: Phaser.GameObjects.Graphics;
+
+  // Terrain is drawn as color bands following the surface curve rather than tile images,
+  // so slopes and crater edges stay smooth at any steepness.
+  private readonly terrainSampleStep = 6;
+  private readonly grassEdgeThickness = 4;
+  private readonly grassThickness = 10;
+  private readonly lightDirtThickness = 70;
+
+  private readonly grassEdgeColor = 0x2f5d2a;
+  private readonly grassColor = 0x4f9c3a;
+  private readonly lightDirtColor = 0x9c6b3e;
+  private readonly darkDirtColor = 0x6b4423;
+  private readonly scorchColor = 0x241812;
+  private readonly scorchAlpha = 0.55;
 
   public terrainPoints = this.initialTerrainPoints.map((point) => ({ ...point }));
 
@@ -80,6 +98,8 @@ export class GameScene extends Phaser.Scene {
 
   public player1HpText!: Phaser.GameObjects.Text;
   public player2HpText!: Phaser.GameObjects.Text;
+
+  public uiCamera!: Phaser.Cameras.Scene2D.Camera;
 
   public isSettingsPopupOpen = false;
 
@@ -107,15 +127,13 @@ export class GameScene extends Phaser.Scene {
     this.load.image("vehicle-fired-1", fired1Url);
     this.load.image("vehicle-fired-2", fired2Url);
     this.load.image("vehicle-fired-3", fired3Url);
-    this.load.image("green-lake-background", greenLakeUrl);
+    this.load.image("hill-background", hillUrl);
     this.load.audio("truck-sfx", truckSfxUrl);
     this.load.audio("brick-explode-sfx", brickExplodeSfxUrl);
     this.load.audio("explode-sfx", explodeSfxUrl);
     this.load.audio("projectile-sfx", projectileSfxUrl);
     this.load.audio("dagored-music", dagoredUrl);
     this.load.audio("pufino-music", pufinoUrl);
-    // frameHeight must keep 4 full rows within the 887px source height (4 * 222 would overflow and drop row 3).
-    this.load.spritesheet("land-tiles", landUrl, { frameWidth: 197, frameHeight: 221 });
     this.load.image("vehicle-man", man1Url);
     this.load.image("vehicle-wheel", wheels1Url);
   }
@@ -129,28 +147,95 @@ export class GameScene extends Phaser.Scene {
   }
 
   public drawTerrain(): void {
-    this.terrainTiles.forEach((tile) => tile.destroy());
-    this.terrainTiles = [];
+    this.terrainGraphics ??= this.add.graphics();
+    this.terrainGraphics.setDepth(0);
+    this.terrainGraphics.clear();
 
-    const tileSize = this.terrainTileSize;
+    const samples = this.sampleTerrainSurface();
+    const grassBottom = this.grassEdgeThickness + this.grassThickness;
+    const dirtBottom = grassBottom + this.lightDirtThickness;
 
-    for (let x = tileSize / 2; x < 1280; x += tileSize) {
-      const surfaceY = this.getTerrainY(x);
-      const surfaceRow = Math.floor(surfaceY / tileSize);
-      const isBurnt = this.explosionZones.some(
-        (zone) => Math.abs(x - zone.x) <= zone.radius,
-      );
+    this.fillTerrainBand(samples, dirtBottom, this.worldHeight, this.darkDirtColor);
+    this.fillTerrainBand(samples, grassBottom, dirtBottom, this.lightDirtColor);
+    this.fillTerrainBand(samples, this.grassEdgeThickness, grassBottom, this.grassColor);
+    this.fillTerrainBand(samples, 0, this.grassEdgeThickness, this.grassEdgeColor);
 
-      for (let row = surfaceRow; row * tileSize < 720; row++) {
-        const isSurface = row === surfaceRow;
-        const frame = isSurface ? (isBurnt ? this.burntTileFrame : this.grassTileFrame) : this.dirtTileFrame;
-        const tile = this.add.image(x, row * tileSize + tileSize / 2, "land-tiles", frame);
+    this.fillScorchedPatches(samples, dirtBottom);
+  }
 
-        // Oversize significantly: the source art has inner padding, so edge-to-edge sizing leaves visible gaps.
-        tile.setDisplaySize(tileSize * 1.8, tileSize * 1.8);
-        tile.setDepth(0);
+  private sampleTerrainSurface(): { x: number; y: number; burnt: boolean }[] {
+    const samples: { x: number; y: number; burnt: boolean }[] = [];
 
-        this.terrainTiles.push(tile);
+    for (let x = 0; x <= this.worldWidth; x += this.terrainSampleStep) {
+      samples.push({
+        x,
+        y: this.getTerrainY(x),
+        burnt: this.explosionZones.some((zone) => Math.abs(x - zone.x) <= zone.radius),
+      });
+    }
+
+    if (samples[samples.length - 1].x < this.worldWidth) {
+      samples.push({
+        x: this.worldWidth,
+        y: this.getTerrainY(this.worldWidth),
+        burnt: this.explosionZones.some(
+          (zone) => Math.abs(this.worldWidth - zone.x) <= zone.radius,
+        ),
+      });
+    }
+
+    return samples;
+  }
+
+  // Draws a band that follows the surface curve between two vertical offsets, so slopes
+  // and crater edges stay smooth instead of being stair-stepped like a tile grid.
+  private fillTerrainBand(
+    samples: { x: number; y: number }[],
+    topOffset: number,
+    bottomOffset: number,
+    color: number,
+    alpha = 1,
+  ): void {
+    const graphics = this.terrainGraphics!;
+
+    graphics.fillStyle(color, alpha);
+    graphics.beginPath();
+    graphics.moveTo(samples[0].x, samples[0].y + topOffset);
+
+    for (const sample of samples) {
+      graphics.lineTo(sample.x, sample.y + topOffset);
+    }
+
+    for (let i = samples.length - 1; i >= 0; i--) {
+      graphics.lineTo(samples[i].x, samples[i].y + bottomOffset);
+    }
+
+    graphics.closePath();
+    graphics.fillPath();
+  }
+
+  // Overlays a translucent char color across each blast radius so the scorched ground
+  // reads as browned/blackened without needing separate burnt texture variants.
+  private fillScorchedPatches(
+    samples: { x: number; y: number; burnt: boolean }[],
+    scorchDepth: number,
+  ): void {
+    let runStart = -1;
+
+    for (let i = 0; i <= samples.length; i++) {
+      const isBurnt = i < samples.length && samples[i].burnt;
+
+      if (isBurnt && runStart === -1) {
+        runStart = i;
+        continue;
+      }
+
+      if (!isBurnt && runStart !== -1) {
+        const run = samples.slice(Math.max(0, runStart - 1), i + 1);
+
+        this.fillTerrainBand(run, 0, scorchDepth, this.scorchColor, this.scorchAlpha);
+
+        runStart = -1;
       }
     }
   }
@@ -289,7 +374,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    return 720;
+    return this.worldHeight;
   }
 
   public getTerrainAngle(x: number): number {
@@ -324,5 +409,37 @@ export class GameScene extends Phaser.Scene {
 
   public generateWind(): void {
     this.wind = Phaser.Math.Between(-10, 10);
+  }
+
+  public syncCamera(force = false, delta = 0): void {
+    if (!this.player1 || !this.player2) {
+      return;
+    }
+
+    const camera = this.cameras.main;
+    const player1X = this.player1.getCenterX();
+    const player2X = this.player2.getCenterX();
+
+    const playerSpanX = Math.abs(player1X - player2X);
+    const paddedSpanX = Math.max(480, playerSpanX + 420);
+    const targetZoom = Phaser.Math.Clamp(camera.width / paddedSpanX, 0.7, 1.15);
+    const currentZoom = force ? targetZoom : Phaser.Math.Linear(camera.zoom, targetZoom, Math.min(1, delta / 220));
+
+    const midX = (player1X + player2X) / 2;
+    const viewHalfWidth = camera.width / (2 * currentZoom);
+    const viewHalfHeight = camera.height / (2 * currentZoom);
+
+    let targetCenterX = midX;
+
+    if (viewHalfWidth >= this.worldWidth / 2) {
+      targetCenterX = this.worldWidth / 2;
+    } else {
+      targetCenterX = Phaser.Math.Clamp(midX, viewHalfWidth, this.worldWidth - viewHalfWidth);
+    }
+
+    const targetCenterY = this.worldHeight - viewHalfHeight;
+
+    camera.setZoom(currentZoom);
+    camera.centerOn(targetCenterX, targetCenterY);
   }
 }

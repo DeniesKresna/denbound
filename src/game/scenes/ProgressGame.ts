@@ -29,6 +29,8 @@ export function progressGame(scene: GameScene, delta: number): void {
   }
 
   updateHud(scene);
+
+  scene.syncCamera(false, delta);
 }
 
 function updateMovement(scene: GameScene, delta: number): void {
@@ -87,7 +89,7 @@ function updateMovement(scene: GameScene, delta: number): void {
 
   scene.currentPlayer.setMoveBarVisible(isMoving);
 
-  const playerX = Phaser.Math.Clamp(scene.currentPlayer.getX(), 25, 1255);
+  const playerX = Phaser.Math.Clamp(scene.currentPlayer.getX(), 25, scene.worldWidth - 25);
 
   const terrainY = scene.getTerrainY(playerX);
   const terrainAngle = scene.getTerrainAngle(playerX);
@@ -182,7 +184,7 @@ function checkProjectileCollision(scene: GameScene): void {
   const projectileX = scene.projectile.getX();
   const projectileY = scene.projectile.getY();
 
-  if (projectileX < 0 || projectileX > 1280 || projectileY > 720) {
+  if (projectileX < 0 || projectileX > scene.worldWidth || projectileY > scene.worldHeight) {
     scene.projectile.destroy();
     scene.projectile = undefined;
     finishShot(scene);

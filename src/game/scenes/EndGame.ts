@@ -189,7 +189,7 @@ function destroyTerrain(
     y: number;
   }[] = [];
 
-  for (let x = 0; x <= 1280; x += 5) {
+  for (let x = 0; x <= scene.worldWidth; x += 5) {
     const currentY = scene.getTerrainY(x);
 
     const distanceX = x - explosionX;
@@ -230,32 +230,41 @@ function updatePlayersGroundPosition(scene: GameScene): void {
 
 function showGameOverPopup(scene: GameScene, title: string): void {
   const { width, height } = scene.scale;
+  const uiObjects: Phaser.GameObjects.GameObject[] = [];
+
+  const register = <T extends Phaser.GameObjects.GameObject>(object: T): T => {
+    uiObjects.push(object);
+
+    return object;
+  };
+
   const backdrop = scene.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55);
+  register(backdrop);
   backdrop.setDepth(100);
 
-  const panel = scene.add.rectangle(width / 2, height / 2, 520, 250, 0x16324f);
+  const panel = register(scene.add.rectangle(width / 2, height / 2, 520, 250, 0x16324f));
   panel.setStrokeStyle(6, 0xffffff, 0.35);
   panel.setDepth(101);
 
-  const winnerText = scene.add.text(width / 2, height / 2 - 55, title, {
+  const winnerText = register(scene.add.text(width / 2, height / 2 - 55, title, {
     fontSize: "38px",
     color: "#ffffff",
     fontStyle: "bold",
     align: "center",
-  });
+  }));
   winnerText.setOrigin(0.5);
   winnerText.setDepth(102);
 
-  const restartButton = scene.add.rectangle(width / 2, height / 2 + 55, 220, 56, 0x2ecc71);
+  const restartButton = register(scene.add.rectangle(width / 2, height / 2 + 55, 220, 56, 0x2ecc71));
   restartButton.setStrokeStyle(4, 0xffffff, 0.4);
   restartButton.setInteractive({ useHandCursor: true });
   restartButton.setDepth(102);
 
-  const restartText = scene.add.text(width / 2, height / 2 + 55, "Main Ulang", {
+  const restartText = register(scene.add.text(width / 2, height / 2 + 55, "Main Ulang", {
     fontSize: "24px",
     color: "#0b1b14",
     fontStyle: "bold",
-  });
+  }));
   restartText.setOrigin(0.5);
   restartText.setDepth(103);
 
@@ -271,6 +280,8 @@ function showGameOverPopup(scene: GameScene, title: string): void {
     scene.stopMusic();
     scene.scene.restart();
   });
+
+  scene.cameras.main.ignore(uiObjects);
 }
 
 export function showSettingsPopup(scene: GameScene): void {
@@ -476,4 +487,6 @@ export function showSettingsPopup(scene: GameScene): void {
       closePopup();
     });
   }
+
+  scene.cameras.main.ignore(uiObjects);
 }

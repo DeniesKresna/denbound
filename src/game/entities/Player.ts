@@ -232,8 +232,11 @@ export class Player {
   // the math convention (counter-clockwise, y-up) used by the sin/cos tip/velocity formulas.
   private getCannonWorldAngle(): number {
     const terrainAngle = this.vehicle.getTerrainAngle();
+    const rawAngle = -terrainAngle + this.aimOffset;
 
-    return -terrainAngle + this.aimOffset;
+    // On steep crater walls terrainAngle can near 90°, and without this clamp
+    // rawAngle crosses ±90° so cos() flips sign and the barrel swings backward into the vehicle.
+    return Phaser.Math.Clamp(rawAngle, -80, 80);
   }
 
   // Shared by the visual barrel and getCannonTip() so both match the projectile velocity formula.

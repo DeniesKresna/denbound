@@ -7,11 +7,16 @@ export function initializeGame(scene: GameScene): void {
   scene.resetGameState();
   scene.playGameMusic();
 
+  scene.cameras.main.setBounds(0, 0, scene.worldWidth, scene.worldHeight);
+  scene.uiCamera = scene.cameras.add(0, 0, scene.scale.width, scene.scale.height);
+  scene.uiCamera.setScroll(0, 0);
+  scene.uiCamera.setZoom(1);
+
   createBackground(scene);
   createTerrain(scene);
 
-  const player1X = 200;
-  const player2X = 1080;
+  const player1X = 260;
+  const player2X = scene.worldWidth - 260;
 
   scene.player1 = new Player(
     scene,
@@ -30,6 +35,8 @@ export function initializeGame(scene: GameScene): void {
     0xe74c3c,
     "left",
   );
+
+  scene.uiCamera.ignore(scene.children.list);
 
   createBattleHud(scene);
 
@@ -52,13 +59,16 @@ export function initializeGame(scene: GameScene): void {
   });
 
   scene.windText.setOrigin(0.5);
+  scene.windText.setScrollFactor(0);
+  scene.cameras.main.ignore(scene.windText);
+
+  scene.syncCamera(true);
 }
 
 function createBackground(scene: GameScene): void {
-  const background = scene.add.image(640, 360, "green-lake-background");
-  background.setDisplaySize(1280, 720);
+  const background = scene.add.image(scene.worldWidth / 2, scene.worldHeight / 2, "hill-background");
+  background.setDisplaySize(scene.worldWidth, scene.worldHeight);
   background.setDepth(-100);
-  background.setScrollFactor(0);
 }
 
 function createTerrain(scene: GameScene): void {
@@ -68,19 +78,27 @@ function createTerrain(scene: GameScene): void {
 function createBattleHud(scene: GameScene): void {
   const barWidth = 400;
   const barHeight = 24;
+  const uiObjects: Phaser.GameObjects.GameObject[] = [];
 
-  scene.add.text(30, 15, "PLAYER 1", {
+  const register = <T extends Phaser.GameObjects.GameObject>(object: T): T => {
+    uiObjects.push(object);
+
+    return object;
+  };
+
+  register(scene.add.text(30, 15, "PLAYER 1", {
     fontSize: "16px",
     color: "#ffffff",
-  });
+  }).setScrollFactor(0));
 
-  scene.add.rectangle(30, 42, barWidth, barHeight, 0x222222).setOrigin(0, 0.5);
+  register(scene.add.rectangle(30, 42, barWidth, barHeight, 0x222222).setOrigin(0, 0.5).setScrollFactor(0));
 
-  scene.player1HpBar = scene.add.rectangle(30, 42, barWidth, barHeight, 0x2ecc71);
+  scene.player1HpBar = register(scene.add.rectangle(30, 42, barWidth, barHeight, 0x2ecc71));
 
   scene.player1HpBar.setOrigin(0, 0.5);
+  scene.player1HpBar.setScrollFactor(0);
 
-  scene.player1HpText = scene.add.text(
+  scene.player1HpText = register(scene.add.text(
     30 + barWidth / 2,
     42,
     `${Math.round(scene.player1.getHP())} HP`,
@@ -88,24 +106,29 @@ function createBattleHud(scene: GameScene): void {
       fontSize: "14px",
       color: "#ffffff",
     },
-  );
+  ));
 
   scene.player1HpText.setOrigin(0.5);
+  scene.player1HpText.setScrollFactor(0);
 
-  scene
-    .add.text(1250, 15, "PLAYER 2", {
+  register(
+    scene
+      .add.text(1250, 15, "PLAYER 2", {
       fontSize: "16px",
       color: "#ffffff",
     })
-    .setOrigin(1, 0);
+    .setOrigin(1, 0)
+    .setScrollFactor(0),
+  );
 
-  scene.add.rectangle(1250, 42, barWidth, barHeight, 0x222222).setOrigin(1, 0.5);
+  register(scene.add.rectangle(1250, 42, barWidth, barHeight, 0x222222).setOrigin(1, 0.5).setScrollFactor(0));
 
-  scene.player2HpBar = scene.add.rectangle(1250, 42, barWidth, barHeight, 0x2ecc71);
+  scene.player2HpBar = register(scene.add.rectangle(1250, 42, barWidth, barHeight, 0x2ecc71));
 
   scene.player2HpBar.setOrigin(1, 0.5);
+  scene.player2HpBar.setScrollFactor(0);
 
-  scene.player2HpText = scene.add.text(
+  scene.player2HpText = register(scene.add.text(
     1250 - barWidth / 2,
     42,
     `${Math.round(scene.player2.getHP())} HP`,
@@ -113,30 +136,41 @@ function createBattleHud(scene: GameScene): void {
       fontSize: "14px",
       color: "#ffffff",
     },
-  );
+  ));
 
   scene.player2HpText.setOrigin(0.5);
+  scene.player2HpText.setScrollFactor(0);
 
-  createSettingsButton(scene);
+  createSettingsButton(scene, uiObjects);
+
+  scene.cameras.main.ignore(uiObjects);
 }
 
-function createSettingsButton(scene: GameScene): void {
+function createSettingsButton(scene: GameScene, uiObjects: Phaser.GameObjects.GameObject[]): void {
+  const register = <T extends Phaser.GameObjects.GameObject>(object: T): T => {
+    uiObjects.push(object);
+
+    return object;
+  };
+
   const buttonSize = 28;
   const buttonX = 1256;
   const buttonY = 19;
 
-  const button = scene.add.rectangle(buttonX, buttonY, buttonSize, buttonSize, 0x16324f, 0.96);
+  const button = register(scene.add.rectangle(buttonX, buttonY, buttonSize, buttonSize, 0x16324f, 0.96));
   button.setStrokeStyle(2, 0xffffff, 0.3);
   button.setDepth(9);
+  button.setScrollFactor(0);
   button.setInteractive({ useHandCursor: true });
 
-  const icon = scene.add.text(buttonX, buttonY + 0.5, "settings", {
+  const icon = register(scene.add.text(buttonX, buttonY + 0.5, "settings", {
     fontFamily: "Material Symbols Outlined",
     fontSize: "18px",
     color: "#ffffff",
-  });
+  }));
   icon.setOrigin(0.5);
   icon.setDepth(10);
+  icon.setScrollFactor(0);
 
   button.on("pointerover", () => {
     button.setFillStyle(0x23405f, 1);
